@@ -1,0 +1,92 @@
+# Reimportar bibliotecas necesarias después del reinicio
+from graphviz import Digraph
+
+# Crear el diagrama UML de clases
+uml = Digraph('UML_Reserva_Citas', format='png')
+uml.attr(rankdir='LR')
+
+# Definir las clases principales
+uml.node('Cliente', '''Cliente
+- id: int
+- nombre: string
+- correo: string
+- telefono: string
+---------------------------
++ iniciarSesion()
++ reservarCita()
++ cancelarCita()
++ verHistorialCitas()''')
+
+uml.node('Administrador', '''Administrador
+- id: int
+- nombre: string
+- correo: string
+---------------------------
++ gestionarServicios()
++ gestionarUsuarios()
++ generarReportes()''')
+
+uml.node('UsuarioExterno', '''UsuarioExterno
+- id: int
+- nombre: string
+- correo: string
+---------------------------
++ ofrecerServicio()
++ actualizarDisponibilidad()''')
+
+uml.node('Servicio', '''Servicio
+- id: int
+- nombre: string
+- descripcion: string
+- precio: float
+---------------------------
++ actualizarServicio()
++ eliminarServicio()''')
+
+uml.node('Cita', '''Cita
+- id: int
+- fecha: date
+- hora: time
+- estado: string
+---------------------------
++ confirmarCita()
++ cancelarCita()''')
+
+uml.node('Pago', '''Pago
+- id: int
+- monto: float
+- metodo: string
+- estado: string
+---------------------------
++ procesarPago()
++ generarRecibo()''')
+
+uml.node('Soporte', '''Soporte
+- id: int
+- descripcion: string
+- estado: string
+---------------------------
++ crearTicket()
++ resolverTicket()''')
+
+# Definir relaciones entre clases
+uml.edge('Cliente', 'Cita', label='realiza >')
+uml.edge('Cliente', 'Pago', label='realiza >')
+uml.edge('Cliente', 'Soporte', label='solicita >')
+
+uml.edge('Administrador', 'Servicio', label='gestiona >')
+uml.edge('Administrador', 'Cita', label='verifica >')
+uml.edge('Administrador', 'Pago', label='supervisa >')
+
+uml.edge('UsuarioExterno', 'Servicio', label='ofrece >')
+uml.edge('UsuarioExterno', 'Cita', label='actualiza disponibilidad >')
+
+uml.edge('Cita', 'Servicio', label='se reserva para >')
+uml.edge('Pago', 'Cita', label='confirma >')
+
+# Renderizar el diagrama
+uml_path = "/mnt/data/uml_diagrama_reserva_citas"
+uml.render(uml_path)
+
+# Mostrar la imagen generada
+uml_path + ".png"

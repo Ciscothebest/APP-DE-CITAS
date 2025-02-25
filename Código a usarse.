@@ -1,91 +1,92 @@
-from graphviz import Digraph
+# Singleton: Administrador
+class Administrador:
+    _instancia = None
 
-# Crear el diagrama UML de clases
-uml = Digraph('UML_Reserva_Citas', format='png')
-uml.attr(rankdir='LR')
+    def __new__(cls, id, nombre, correo):
+        if cls._instancia is None:
+            cls._instancia = super().__new__(cls)
+            cls._instancia.id = id
+            cls._instancia.nombre = nombre
+            cls._instancia.correo = correo
+        return cls._instancia
 
-# Definir las clases principales
-uml.node('Cliente', '''Cliente
-- id: int
-- nombre: string
-- correo: string
-- telefono: string
----------------------------
-+ iniciarSesion()
-+ reservarCita()
-+ cancelarCita()
-+ verHistorialCitas()''')
+    def gestionar_servicios(self):
+        print("Gestionando servicios...")
 
-uml.node('Administrador', '''Administrador
-- id: int
-- nombre: string
-- correo: string
----------------------------
-+ gestionarServicios()
-+ gestionarUsuarios()
-+ generarReportes()''')
+    def gestionar_usuarios(self):
+        print("Gestionando usuarios...")
 
-uml.node('UsuarioExterno', '''UsuarioExterno
-- id: int
-- nombre: string
-- correo: string
----------------------------
-+ ofrecerServicio()
-+ actualizarDisponibilidad()''')
+    def generar_reportes(self):
+        print("Generando reportes...")
 
-uml.node('Servicio', '''Servicio
-- id: int
-- nombre: string
-- descripcion: string
-- precio: float
----------------------------
-+ actualizarServicio()
-+ eliminarServicio()''')
+    # Método actualizar para que funcione como observador
+    def actualizar(self, mensaje):
+        print(f"📢 Notificación para el Administrador: {mensaje}")
 
-uml.node('Cita', '''Cita
-- id: int
-- fecha: date
-- hora: time
-- estado: string
----------------------------
-+ confirmarCita()
-+ cancelarCita()''')
+# Observer: Cliente y Administrador observan cambios en Cita
+class Observador:
+    def actualizar(self, mensaje):
+        pass
 
-uml.node('Pago', '''Pago
-- id: int
-- monto: float
-- metodo: string
-- estado: string
----------------------------
-+ procesarPago()
-+ generarRecibo()''')
+class Cliente(Observador):
+    def __init__(self, id, nombre, correo, telefono):
+        self.id = id
+        self.nombre = nombre
+        self.correo = correo
+        self.telefono = telefono
 
-uml.node('Soporte', '''Soporte
-- id: int
-- descripcion: string
-- estado: string
----------------------------
-+ crearTicket()
-+ resolverTicket()''')
+    def iniciar_sesion(self):
+        print(f"{self.nombre} ha iniciado sesión.")
 
-# Definir relaciones entre clases
-uml.edge('Cliente', 'Cita', label='realiza >')
-uml.edge('Cliente', 'Pago', label='realiza >')
-uml.edge('Cliente', 'Soporte', label='solicita >')
+    def reservar_cita(self):
+        print(f"{self.nombre} ha reservado una cita.")
 
-uml.edge('Administrador', 'Servicio', label='gestiona >')
-uml.edge('Administrador', 'Cita', label='verifica >')
-uml.edge('Administrador', 'Pago', label='supervisa >')
+    def cancelar_cita(self):
+        print(f"{self.nombre} ha cancelado una cita.")
 
-uml.edge('UsuarioExterno', 'Servicio', label='ofrece >')
-uml.edge('UsuarioExterno', 'Cita', label='actualiza disponibilidad >')
+    def ver_historial_citas(self):
+        print(f"Mostrando historial de citas de {self.nombre}.")
 
-uml.edge('Cita', 'Servicio', label='se reserva para >')
-uml.edge('Pago', 'Cita', label='confirma >')
+    def actualizar(self, mensaje):
+        print(f"🔔 Notificación para {self.nombre}: {mensaje}")
 
-# Renderizar el diagrama
-uml_path = "/mnt/data/uml_diagrama_reserva_citas"
-uml.render(uml_path)
+# Sujeto: Cita
+class Cita:
+    def __init__(self, id, fecha, hora):
+        self.id = id
+        self.fecha = fecha
+        self.hora = hora
+        self.estado = "Pendiente"
+        self.observadores = []
 
-# Mostrar la imagen generada
-uml_path + ".png"
+    def agregar_observador(self, observador):
+        self.observadores.append(observador)
+
+    def eliminar_observador(self, observador):
+        self.observadores.remove(observador)
+
+    def notificar_observadores(self):
+        mensaje = f"La cita {self.id} ha cambiado de estado a {self.estado}."
+        for observador in self.observadores:
+            observador.actualizar(mensaje)
+
+    def confirmar_cita(self):
+        self.estado = "Confirmada"
+        self.notificar_observadores()
+
+    def cancelar_cita(self):
+        self.estado = "Cancelada"
+        self.notificar_observadores()
+
+# Ejemplo de uso
+admin = Administrador(1, "Admin1", "admin@example.com")
+cliente1 = Cliente(101, "Juan Pérez", "juan@example.com", "555-1234")
+
+cita1 = Cita(1, "2025-03-01", "10:00 AM")
+cita1.agregar_observador(cliente1)
+cita1.agregar_observador(admin)  # El administrador también puede observar
+
+print("📅 Reservando una cita...")
+cita1.confirmar_cita()  # Notificará a los observadores
+print("\n🚫 Cancelando la cita...")
+cita1.cancelar_cita()  # No

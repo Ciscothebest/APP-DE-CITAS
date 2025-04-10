@@ -1,0 +1,211 @@
+// --- backend/app.js ---
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const authRoutes = require('./routes/authRoutes');
+const citaRoutes = require('./routes/citaRoutes');
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+app.use('/api/auth', authRoutes);
+app.use('/api/citas', citaRoutes);
+
+module.exports = app;
+
+// --- backend/server.js ---
+const app = require('./app');
+const PORT = process.env.PORT || 5000;
+const connectDB = require('./middleware/db');
+
+connectDB();
+app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+
+// --- backend/middleware/db.js ---
+const mongoose = require('mongoose');
+const MONGO_URI = 'mongodb://localhost:27017/bookea';
+
+const connectDB = async () => {
+  try {
+    await mongoose.connect(MONGO_URI);
+    console.log('Conectado a MongoDB');
+  } catch (error) {
+    console.error(error);
+    process.exit(1);
+  }
+};
+
+module.exports = connectDB;
+
+// --- backend/models/Cliente.js ---
+const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
+
+const clienteSchema = new Schema({
+  nombre: String,
+  correo: { type: String, unique: true },
+  telefono: String,
+  password: String,
+});
+
+module.exports = mongoose.model('Cliente', clienteSchema);
+
+// --- backend/routes/authRoutes.js ---
+const express = require('express');
+const router = express.Router();
+const jwt = require('jsonwebtoken');
+const Cliente = require('../models/Cliente');
+const bcrypt = require('bcrypt');
+
+router.post('/register', async (req, res) => {
+  try {
+    const { nombre, correo, telefono, password } = req.body;
+    const hashed = await bcrypt.hash(password, 10);
+    const nuevoCliente = new Cliente({ nombre, correo, telefono, password: hashed });
+    await nuevoCliente.save();
+    res.status(201).json({ message: 'Usuario registrado' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/login', async (req, res) => {
+  try {
+    const { correo, password } = req.body;
+    const cliente = await Cliente.findOne({ correo });
+    if (!cliente) return res.status(400).json({ error: 'Usuario no encontrado' });
+    const valid = await bcrypt.compare(password, cliente.password);
+    if (!valid) return res.status(400).json({ error: 'Credenciales inválidas' });
+    const token = jwt.sign({ id: cliente._id }, 'secreto', { expiresIn: '1d' });
+    res.json({ token });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;
+
+// --- backend/models/Cita.js ---
+const citaSchema = new Schema({
+  clienteId: { type: Schema.Types.ObjectId, ref: 'Cliente' },
+  fecha: Date,
+  hora: String,
+  estado: { type: String, default: 'Pendiente' }
+});
+
+module.exports = mongoose.model('Cita', citaSchema);
+
+// --- backend/routes/citaRoutes.js ---
+const express = require('express');
+const router = express.Router();
+const Cita = require('../models/Cita');
+const jwt = require('jsonwebtoken');
+
+const authMiddleware = (req, res, next) => {
+  const token = req.headers.authorization;
+  if (!token) return res.status(401).json({ error: 'No autorizado' });
+  try {
+    const decoded = jwt.verify(token, 'secreto');
+    req.userId = decoded.id;
+    next();
+  } catch (err) {
+    return res.status(403).json({ error: 'Token inválido' });
+  }
+};
+
+router.post('/', authMiddleware, async (req, res) => {
+  try {
+    const { fecha, hora } = req.body;
+    const nuevaCita = new Cita({ clienteId: req.userId, fecha, hora });
+    await nuevaCita.save();
+    res.status(201).json(nuevaCita);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/', authMiddleware, async (req, res) => {
+  const citas = await Cita.find({ clienteId: req.userId });
+  res.json(citas);
+});
+
+module.exports = router;
+
+// --- frontend/src/App.js ---
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import LoginPage from './pages/LoginPage';
+import Dashboard from './pages/Dashboard';
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LoginPage />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+// --- frontend/src/pages/LoginPage.js ---
+import React, { useState } from 'react';
+
+export default function LoginPage() {
+  const [correo, setCorreo] = useState('');
+  const [password, setPassword] = useState('');
+
+  const login = async () => {
+    const res = await fetch('http://localhost:5000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ correo, password })
+    });
+    const data = await res.json();
+    if (data.token) {
+      localStorage.setItem('token', data.token);
+      window.location.href = '/dashboard';
+    } else {
+      alert('Error de login');
+    }
+  };
+
+  return (
+    <div>
+      <h2>Iniciar sesión</h2>
+      <input value={correo} onChange={e => setCorreo(e.target.value)} placeholder="Correo" />
+      <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña" type="password" />
+      <button onClick={login}>Entrar</button>
+    </div>
+  );
+}
+
+// --- frontend/src/pages/Dashboard.js ---
+import React, { useEffect, useState } from 'react';
+
+export default function Dashboard() {
+  const [citas, setCitas] = useState([]);
+
+  useEffect(() => {
+    const fetchCitas = async () => {
+      const res = await fetch('http://localhost:5000/api/citas', {
+        headers: { Authorization: localStorage.getItem('token') }
+      });
+      const data = await res.json();
+      setCitas(data);
+    };
+    fetchCitas();
+  }, []);
+
+  return (
+    <div>
+      <h2>Mis citas</h2>
+      <ul>
+        {citas.map(cita => (
+          <li key={cita._id}>{cita.fecha} - {cita.hora} ({cita.estado})</li>
+        ))}
+      </ul>
+    </div>
+  );
+}

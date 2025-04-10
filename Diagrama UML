@@ -1,52 +1,90 @@
 @startuml
 
-interface Observador {
-    + actualizar(mensaje: string)
+class Cliente {
+  - id: int
+  - nombre: string
+  - correo: string
+  - telefono: string
+  + iniciarSesion()
+  + reservarCita()
+  + cancelarCita()
+  + verHistorialCitas()
+  + actualizar(mensaje: string)
 }
 
-class Cliente implements Observador {
-    - id: int
-    - nombre: string
-    - correo: string
-    - telefono: string
-    --
-    + actualizar(mensaje: string)
-    + reservarCita()
-    + cancelarCita()
+class Administrador {
+  - id: int
+  - nombre: string
+  - correo: string
+  + gestionarServicios()
+  + gestionarUsuarios()
+  + generarReportes()
+  + actualizar(mensaje: string)
 }
 
-class Administrador implements Observador {
-    - id: int
-    - nombre: string
-    - correo: string
-    --
-    + gestionarServicios()
-    + gestionarUsuarios()
-    + generarReportes()
-    + actualizar(mensaje: string)
-    --
-    ' Singleton
-    - static _instancia: Administrador
-    + static getInstance(): Administrador
+class UsuarioExterno {
+  - id: int
+  - nombre: string
+  - correo: string
+  + ofrecerServicio()
+  + actualizarDisponibilidad()
+}
+
+class Servicio {
+  - id: int
+  - nombre: string
+  - descripcion: string
+  - precio: float
+  + actualizarServicio()
+  + eliminarServicio()
 }
 
 class Cita {
-    - id: int
-    - fecha: string
-    - hora: string
-    - estado: string
-    - observadores: List<Observador>
-    --
-    + agregarObservador(obs: Observador)
-    + eliminarObservador(obs: Observador)
-    + notificarObservadores()
-    + confirmarCita()
-    + cancelarCita()
+  - id: int
+  - fecha: Date
+  - hora: Time
+  - estado: string
+  - observadores: List<Observador>
+  + confirmarCita()
+  + cancelarCita()
+  + agregarObservador(obs: Observador)
+  + eliminarObservador(obs: Observador)
+  + notificarObservadores()
 }
 
-' Relaciones
+class Pago {
+  - id: int
+  - monto: float
+  - metodo: string
+  - estado: string
+  + procesarPago()
+  + generarRecibo()
+}
+
+class Soporte {
+  - id: int
+  - descripcion: string
+  - estado: string
+  + crearTicket()
+  + resolverTicket()
+}
+
+interface Observador {
+  + actualizar(mensaje: string)
+}
+
 Observador <|.. Cliente
 Observador <|.. Administrador
-Cita o-- Observador : "notifica >"
+
+Cliente --> Cita : "1..* reserva"
+Cliente --> Pago : "1..* realiza"
+Cliente --> Soporte : "0..* solicita"
+Administrador --> Servicio : "1 gestiona *"
+Administrador --> Pago : "1 supervisa *"
+UsuarioExterno --> Servicio : "1 ofrece *"
+UsuarioExterno --> Cita : "1 actualiza disponibilidad de *"
+Cita --> Servicio : "1 cita para 1 servicio"
+Pago --> Cita : "1 pago confirma 1 cita"
 
 @enduml
+
